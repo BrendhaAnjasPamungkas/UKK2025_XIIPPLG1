@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "334981123241",
+    "project_id": "ukk-xii-pplg-1-2025-bren",
+    "storage_bucket": "ukk-xii-pplg-1-2025-bren.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:334981123241:android:301eb1f94a8eba5c03adb8",
+        "android_client_info": {
+          "package_name": "com.example.project_ukk"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfdbeSa_kAbz35ckUEnZgaS8uqWZ-iQHs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

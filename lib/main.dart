@@ -1,125 +1,204 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart';
+import 'ulasan_buku.dart';
+import 'admin_pengembalian.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'firebase_options.dart';
+import 'package:flutter_rating_bar/flutter_rating_bar.dart';
+import 'pengembalian.dart';
+import 'tambah_edit_buku.dart';
+import 'task_list.dart';
+import 'notifikasi.dart';
+import 'home_screen.dart';
 
-void main() {
-  runApp(const MyApp());
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  print("Pesan diterima di background: ${message.messageId}");
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      debugShowCheckedModeBanner: false,
+      title: 'Dashboard TDL BREN',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
+        primarySwatch: Colors.green,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: AuthScreen(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
+// ===================== AUTH SCREEN =====================
+class AuthScreen extends StatefulWidget {
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  _AuthScreenState createState() => _AuthScreenState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _AuthScreenState extends State<AuthScreen> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  final TextEditingController usernameController = TextEditingController();
+  final TextEditingController alamatController = TextEditingController();
+  final TextEditingController noTelpController = TextEditingController();
+  String role = 'peminjam';
+  bool isLogin = true;
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+  Future<void> authenticate() async {
+    try {
+      if (isLogin) {
+        UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+          email: emailController.text,
+          password: passwordController.text,
+        );
+
+        String uid = userCredential.user!.uid;
+        DocumentSnapshot userDoc =
+            await FirebaseFirestore.instance.collection('users').doc(uid).get();
+
+        if (userDoc.exists) {
+          String role = userDoc['role'];
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => HomeScreen(role: role)),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Data pengguna tidak ditemukan di Firestore')),
+          );
+        }
+      } else {
+        UserCredential userCredential =
+            await _auth.createUserWithEmailAndPassword(
+          email: emailController.text,
+          password: passwordController.text,
+        );
+
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userCredential.user!.uid)
+            .set({
+          'username': usernameController.text,
+          'email': emailController.text,
+          'alamat': alamatController.text,
+          'noTelp': noTelpController.text,
+          'role': role,
+        });
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomeScreen(role: role)),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  Future<void> resetPassword() async {
+    if (emailController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Masukkan email untuk mereset password.')),
+      );
+      return;
+    }
+    try {
+      await _auth.sendPasswordResetEmail(email: emailController.text);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Email reset password telah dikirim.')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
+      backgroundColor: Colors.green[50],
       body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: EdgeInsets.all(20),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.library_books, size: 100, color: Colors.green),
+                SizedBox(height: 20),
+                Text(
+                  isLogin ? 'TDL BREN' : 'Daftar Akun',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.green[800]),
+                ),
+                SizedBox(height: 20),
+                if (!isLogin)
+                  TextField(
+                    controller: usernameController,
+                    decoration: InputDecoration(labelText: 'Username', border: OutlineInputBorder()),
+                  ),
+                SizedBox(height: 10),
+                TextField(
+                  controller: emailController,
+                  decoration: InputDecoration(labelText: 'Email', border: OutlineInputBorder()),
+                ),
+                SizedBox(height: 10),
+                TextField(
+                  controller: passwordController,
+                  decoration: InputDecoration(labelText: 'Password', border: OutlineInputBorder()),
+                  obscureText: true,
+                ),
+                SizedBox(height: 10),
+                if (!isLogin)
+                  TextField(
+                    controller: alamatController,
+                    decoration: InputDecoration(labelText: 'Alamat', border: OutlineInputBorder()),
+                  ),
+                SizedBox(height: 10),
+                if (!isLogin)
+                  TextField(
+                    controller: noTelpController,
+                    decoration: InputDecoration(labelText: 'No. Telepon', border: OutlineInputBorder()),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  ),
+                SizedBox(height: 10),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    padding: EdgeInsets.symmetric(horizontal: 50, vertical: 15),
+                  ),
+                  onPressed: authenticate,
+                  child: Text(isLogin ? 'Login' : 'Register'),
+                ),
+                if (isLogin)
+                  TextButton(
+                    onPressed: resetPassword,
+                    child: Text('Lupa Password?'),
+                  ),
+                TextButton(
+                  onPressed: () => setState(() => isLogin = !isLogin),
+                  child: Text(isLogin ? 'Daftar' : 'Login'),
+                ),
+              ],
             ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
+          ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
