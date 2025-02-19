@@ -87,6 +87,12 @@ class _AuthScreenState extends State<AuthScreen> {
         });
 
         print("User data berhasil disimpan ke Firestore.");
+        
+        // Navigate to the login screen after registration
+        setState(() {
+          isLogin = true; // Switch to login mode
+        });
+        return; // Exit the method early to avoid navigating to home
       }
 
       String role = await getUserRole(userCredential.user!.uid);
@@ -142,7 +148,7 @@ class _AuthScreenState extends State<AuthScreen> {
       body: Container(
         decoration: BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('images/ikan.jpg'), // Ganti dengan gambar latar Anda
+            image: AssetImage('images/ikan.jpg'),
             fit: BoxFit.cover,
           ),
         ),
@@ -151,7 +157,7 @@ class _AuthScreenState extends State<AuthScreen> {
             child: Padding(
               padding: EdgeInsets.all(20),
               child: Container(
-                width: 300, // Set width to a smaller size
+                width: 300,
                 decoration: BoxDecoration(
                   color: Colors.black54,
                   borderRadius: BorderRadius.circular(10),
@@ -235,10 +241,11 @@ class _AuthScreenState extends State<AuthScreen> {
                       child: Text(isLogin ? 'Log in' : 'Register'),
                     ),
                     SizedBox(height: 10),
-                    TextButton(
-                      onPressed: resetPassword,
-                      child: Text('Forgot Password?', style: TextStyle(color: Colors.white)),
-                    ),
+                    if (isLogin) // Show the button only on login mode
+                      TextButton(
+                        onPressed: resetPassword,
+                        child: Text('Forgot Password?', style: TextStyle(color: Colors.white)),
+                      ),
                     TextButton(
                       onPressed: () {
                         setState(() {

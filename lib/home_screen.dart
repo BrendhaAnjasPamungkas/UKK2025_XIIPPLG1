@@ -2,14 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:project_ukk/taskHistory.dart';
 import 'task_list.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'main.dart';
+import 'profil.dart';
 
 class HomeScreen extends StatefulWidget {
-  final String role; // Tambahkan variabel role
-
+  final String role;
   HomeScreen({required this.role});
+
   _HomeScreenState createState() => _HomeScreenState();
 }
 
@@ -44,7 +46,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-
   void refreshTaskList() {
     setState(() {});
   }
@@ -53,7 +54,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('To-Do List Bren', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+        title: Text('To-Do List Bren',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
         backgroundColor: Colors.green,
       ),
       drawer: Drawer(
@@ -61,18 +63,29 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: EdgeInsets.zero,
           children: [
             UserAccountsDrawerHeader(
-              accountName: Text("Pengguna", style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
-              accountEmail: Text("pengguna@gmail.com", style: GoogleFonts.poppins()),
+              accountName: Text("Brendha",
+                  style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
+              accountEmail:
+                  Text("Brendha@gmail.com", style: GoogleFonts.poppins()),
               currentAccountPicture: CircleAvatar(
+                backgroundImage: AssetImage('assets/images/bren.jpg'),
                 backgroundColor: Colors.white,
-                child: Icon(Icons.person, size: 40.0, color: Colors.green),
+                onBackgroundImageError: (exception, stackTrace) {
+                  print("Gagal memuat gambar: \$exception");
+                },
               ),
               decoration: BoxDecoration(color: Colors.green),
             ),
             ListTile(
-              leading: Icon(Icons.dashboard),
-              title: Text('Dashboard', style: GoogleFonts.poppins()),
-              onTap: () => Navigator.pop(context),
+              leading: Icon(Icons.person),
+              title: Text('Profil', style: GoogleFonts.poppins()),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => ProfileScreen()),
+                );
+              },
             ),
             ListTile(
               leading: Icon(Icons.add_circle),
@@ -90,7 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => TaskHistoryScreen()),
+                  MaterialPageRoute(builder: (context) => TaskHistory()),
                 );
               },
             ),
@@ -113,7 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           children: [
             Expanded(
-              child: TaskList(role: widget.role), // Kirim dari HomeScreen ke TaskList
+              child: TaskList(role: widget.role),
             ),
           ],
         ),
@@ -129,14 +142,36 @@ class AddTaskDialog extends StatefulWidget {
 
 class _AddTaskDialogState extends State<AddTaskDialog> {
   final TextEditingController _taskController = TextEditingController();
+  String selectedCategory = "Pilih Kategori";
+  List<String> categories = [
+    "Penting & Mendesak",
+    "Penting tapi Tidak Mendesak",
+    "Tidak Penting tapi Mendesak",
+    "Tidak Penting & Tidak Mendesak",
+    "Pekerjaan",
+    "Pendidikan",
+    "Keuangan",
+    "Kesehatan",
+    "Rumah Tangga",
+    "Sosial & Keluarga",
+    "Hobi & Pengembangan Diri",
+    "Harian",
+    "Mingguan",
+    "Bulanan",
+    "Belum Dikerjakan",
+    "Sedang Dikerjakan",
+    "Selesai",
+    "Dibatalkan/Ditunda"
+  ];
 
   void addTask() {
-    if (_taskController.text.isNotEmpty) {
+    if (_taskController.text.isNotEmpty &&
+        selectedCategory != "Pilih Kategori") {
       FirebaseFirestore.instance.collection('tasks').add({
         'title': _taskController.text,
-        'task': _taskController.text,
+        'category': selectedCategory,
         'completed': false,
-        'status': 'Belum Selesai',
+        'status': 'Belum Dikerjakan',
         'timestamp': Timestamp.now(),
       });
       Navigator.pop(context);
@@ -147,9 +182,30 @@ class _AddTaskDialogState extends State<AddTaskDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text('Tambah Tugas', style: GoogleFonts.poppins()),
-      content: TextField(
-        controller: _taskController,
-        decoration: InputDecoration(hintText: 'Masukkan tugas'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _taskController,
+            decoration: InputDecoration(hintText: 'Masukkan tugas'),
+          ),
+          SizedBox(height: 10),
+          DropdownButton<String>(
+            value: selectedCategory,
+            isExpanded: true,
+            onChanged: (String? newValue) {
+              setState(() {
+                selectedCategory = newValue!;
+              });
+            },
+            items: ["Pilih Kategori", ...categories].map((String category) {
+              return DropdownMenuItem<String>(
+                value: category,
+                child: Text(category, style: GoogleFonts.poppins()),
+              );
+            }).toList(),
+          ),
+        ],
       ),
       actions: [
         TextButton(
@@ -161,41 +217,6 @@ class _AddTaskDialogState extends State<AddTaskDialog> {
           child: Text('Tambah', style: GoogleFonts.poppins()),
         ),
       ],
-    );
-  }
-}
-
-class TaskHistoryScreen extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Riwayat Tugas', style: GoogleFonts.poppins()),
-        backgroundColor: Colors.green,
-      ),
-      body: StreamBuilder(
-        stream: FirebaseFirestore.instance
-            .collection('tasks')
-            .where('completed', isEqualTo: true)
-            .orderBy('timestamp', descending: true)
-            .snapshots(),
-        builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
-          if (!snapshot.hasData) {
-            return Center(child: CircularProgressIndicator());
-          }
-          var tasks = snapshot.data!.docs;
-          return ListView.builder(
-            itemCount: tasks.length,
-            itemBuilder: (context, index) {
-              var task = tasks[index];
-              return ListTile(
-                title: Text(task['task'], style: GoogleFonts.poppins()),
-                subtitle: Text('Selesai pada: ${task['timestamp'].toDate()}'),
-              );
-            },
-          );
-        },
-      ),
     );
   }
 }

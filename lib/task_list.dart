@@ -29,6 +29,24 @@ class _TaskListState extends State<TaskList> {
     }
   }
 
+  Future<void> moveToHistory(String taskId) async {
+    DocumentSnapshot taskSnapshot = 
+        await FirebaseFirestore.instance.collection('tasks').doc(taskId).get();
+
+    if (taskSnapshot.exists) {
+      Map<String, dynamic> taskData = taskSnapshot.data() as Map<String, dynamic>;
+
+      // Tambahkan timestamp penyelesaian
+      taskData['completedAt'] = FieldValue.serverTimestamp();
+
+      // Pindahkan ke taskHistory
+      await FirebaseFirestore.instance.collection('taskHistory').doc(taskId).set(taskData);
+
+      // Hapus dari tasks
+      await FirebaseFirestore.instance.collection('tasks').doc(taskId).delete();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -78,6 +96,7 @@ class _TaskListState extends State<TaskList> {
                 children: filteredTasks.map((doc) {
                   String taskId = doc.id;
                   bool isCompleted = doc['completed'] ?? false;
+                  String category = doc['category'] ?? 'Tanpa Kategori';
                   String completedTime =
                       doc.data().toString().contains('completedAt') &&
                               doc['completedAt'] != null
@@ -94,7 +113,7 @@ class _TaskListState extends State<TaskList> {
                         ),
                       ),
                       subtitle: Text(
-                        'Dibuat pada: ${(doc['timestamp'] as Timestamp).toDate()}'
+                        'Kategori: $category\nDibuat pada: ${(doc['timestamp'] as Timestamp).toDate()}'
                         '${completedTime.isNotEmpty ? '\n$completedTime' : ''}',
                       ),
                       trailing: Row(
@@ -103,11 +122,11 @@ class _TaskListState extends State<TaskList> {
                           if (!isCompleted)
                             IconButton(
                               icon: Icon(Icons.edit, color: Colors.blue),
-                              onPressed: () => _editTask(taskId, doc['title']),
+                              onPressed: () => _editTask(taskId, doc['title'], category),
                             ),
                           if (!isCompleted)
                             ElevatedButton(
-                              onPressed: () => _markTaskCompleted(taskId),
+                              onPressed: () => moveToHistory(taskId),
                               child: Text('Tandai Selesai'),
                             ),
                           IconButton(
@@ -127,17 +146,30 @@ class _TaskListState extends State<TaskList> {
     );
   }
 
-  void _editTask(String taskId, String currentTitle) {
+  void _editTask(String taskId, String currentTitle, String currentCategory) {
     TextEditingController editController =
         TextEditingController(text: currentTitle);
+    TextEditingController categoryController =
+        TextEditingController(text: currentCategory);
+
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
           title: Text("Edit Tugas"),
-          content: TextField(
-            controller: editController,
-            decoration: InputDecoration(hintText: "Masukkan judul tugas baru"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: editController,
+                decoration: InputDecoration(hintText: "Masukkan judul tugas baru"),
+              ),
+              SizedBox(height: 10),
+              TextField(
+                controller: categoryController,
+                decoration: InputDecoration(hintText: "Masukkan kategori baru"),
+              ),
+            ],
           ),
           actions: [
             TextButton(
@@ -146,7 +178,7 @@ class _TaskListState extends State<TaskList> {
             ),
             ElevatedButton(
               onPressed: () {
-                _updateTask(taskId, editController.text);
+                _updateTask(taskId, editController.text, categoryController.text);
                 Navigator.pop(context);
               },
               child: Text("Simpan"),
@@ -157,24 +189,12 @@ class _TaskListState extends State<TaskList> {
     );
   }
 
-  void _updateTask(String taskId, String newTitle) async {
+  void _updateTask(String taskId, String newTitle, String newCategory) async {
     if (newTitle.isNotEmpty) {
       await FirebaseFirestore.instance
           .collection('tasks')
           .doc(taskId)
-          .update({'title': newTitle});
-    }
-  }
-
-  void _markTaskCompleted(String taskId) async {
-    try {
-      await FirebaseFirestore.instance.collection('tasks').doc(taskId).update({
-        'completed': true,
-        'completedAt': FieldValue.serverTimestamp(),
-      });
-      setState(() {}); // Update UI setelah perubahan
-    } catch (e) {
-      print("Error menandai tugas selesai: \$e");
+          .update({'title': newTitle, 'category': newCategory});
     }
   }
 
